@@ -1,151 +1,194 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class Home extends StatefulWidget {
+  const Home({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<Home> createState() => _HomeState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeState extends State<Home> {
+
+  String fromCurrency = "BRL";
+  String toCurrency = "USD";
+  double rate = 0.0;
+  double total = 0.0;
+  TextEditingController amountController = TextEditingController();
+  List<String> currencies = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrencies();
+  }
+
+  Future<void> _getCurrencies()async{
+    var response = await http.get(Uri.parse('https://api.exchangerate-api.com/v4/latest/USD'));
+
+    var data = json.decode(response.body);
+    setState(() {
+      currencies = (data['rates'] as Map<String, dynamic>).keys.toList();
+      rate = (data['rates'][toCurrency] as num).toDouble();
+
+    });
+  }
+
+   Future<void> _getRate() async {
+  var response = await http.get(Uri.parse('https://api.exchangerate-api.com/v4/latest/$fromCurrency'));
+  var data = json.decode(response.body);
+  setState(() {
+    rate = (data['rates'][toCurrency] as num).toDouble();
+    
+    if (amountController.text.isNotEmpty) {
+      double amount = double.parse(amountController.text);
+      total = amount * rate;
+    }
+  });
+}
+
+void _swapCurrencies() {
+  setState(() {
+    String temp = fromCurrency;
+    fromCurrency = toCurrency;
+    toCurrency = temp;
+    _getRate(); 
+  });
+}
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF1d2630),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('Conversor de Moedas'),
-        centerTitle: true,
+        foregroundColor: Colors.white,
+        title: const Text("Conversor de Moedas"),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(16),
+      child: SingleChildScrollView(
         child: Column(
-        children: [
-          _buildConversorView(bandeiraUrl: 'https://s1.static.brasilescola.uol.com.br/be/conteudo/images/2-bandeira-do-brasil.jpg', 
-          nomePais: 'BRA', 
-          moeda: 'BRL', 
-          simbolo: '\$'),
-          const SizedBox(height: 30,
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                height: 50,
-                width: 50,
-                decoration: BoxDecoration(
+          children: [
+           Padding(
+            padding: const EdgeInsets.all(40),
+            child: Image.asset('assets/images/switch.png',
+            width: MediaQuery.of(context).size.width /2,
+            ),
+           ),
+           Padding(padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
+           child: TextField(
+            controller: amountController,
+            keyboardType: TextInputType.number,
+            style: const TextStyle(
+              color: Colors.white,
+            ),
+            decoration: InputDecoration(
+              labelText: "Quantia",
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              labelStyle: const TextStyle(color: Colors.white),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.indigo.withOpacity(0.2),
-                      spreadRadius: 2,
-                      blurRadius: 5,
-                      offset: const Offset(0, 3)
-                    )
-                  ]
-                ),
-                child: const Center(
-                  child:  Text('=', style: TextStyle(fontSize: 30, fontWeight: FontWeight.w600),),
                 ),
               ),
-                Container(
-                height: 50,
-                //width: 50,
-                decoration: BoxDecoration(
-                  color: Colors.indigo[50],
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(color: Colors.indigo)
-                  ),
-                  child: Padding(padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      children: [
-                        Image.asset('assets/images/switch.png',
-                        height: 30,
-                        ),
-                        const Text('Trocar as moedas', style: TextStyle(color: Colors.indigo, fontSize: 17, fontWeight: FontWeight.w500),)
-                      ],
-                    ),
+               focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(
+                color: Colors.white,
                 ),
+            ),
+           ),
+           onChanged: (value){
+            if(value != ''){
+              setState(() {
+                double amount = double.parse(value);
+                total = amount = amount * rate;
+              });
+            }
+           },
+           ),
           ),
-        ],
+          Padding(padding: EdgeInsets.all(10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              SizedBox(
+                width: 100,
+                child: DropdownButton<String>(
+                  value: fromCurrency,
+                  isExpanded: true,
+                  style: const TextStyle(color: Colors.white),
+                  dropdownColor: Color(0xFF1d2630),
+                  items: currencies.map((String value){
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (newValue){
+                    setState(() {
+                      fromCurrency = newValue!;
+                      _getRate();
+                    });
+                  },
+                ),
+              ),
+              IconButton(
+                onPressed: _swapCurrencies,
+                icon: const Icon(
+                  Icons.swap_horiz,
+                  size: 40,
+                  color: Colors.white,
+                ),
+                ),
+                  SizedBox(
+                  width: 100,
+                  child: DropdownButton<String>(
+                    value: toCurrency,
+                    isExpanded: true,
+                    style: const TextStyle(color: Colors.white),
+                    dropdownColor: Color(0xFF1d2630),
+                    items: currencies.map((String value){
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (newValue){
+                      setState(() {
+                        toCurrency = newValue!;
+                        _getRate();
+                      });
+                    },
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(
-            height: 30,
           ),
-          _buildConversorView(
-            bandeiraUrl: 'https://s1.static.brasilescola.uol.com.br/be/conteudo/images/2-bandeira-do-brasil.jpg', 
-            nomePais: 'BRA', 
-            moeda: 'BRL', 
-            simbolo: '\$'
-          )
-        ],
-        
-        )
+          const SizedBox(height: 10),
+          Text("Taxa de conversao $rate",
+          style: const TextStyle(
+            fontSize: 20, 
+            color: Colors.white,
+          ),
+          ),
+                 const SizedBox(height: 20),
+          Text('${total.toStringAsFixed(3)}',
+            style: const TextStyle(
+              color: Colors.greenAccent,
+              fontSize: 40,
+            ),
+          ),
+          ],
+        ),
+      ),
       ),
     );
-  }
-
-  Container _buildConversorView(
-    {String? bandeiraUrl, String? nomePais, String? moeda ,String? simbolo}) {
-    return Container(
-          height: 170,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(5),
-            boxShadow: [BoxShadow(
-              color: Colors.indigo.withOpacity(0.3),
-              spreadRadius: 2,
-              blurRadius: 4,
-              offset: const Offset(0, 3)
-            )]
-            ),
-            child: Padding(padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(3),
-                      child: 
-                      Image.network(
-                    bandeiraUrl!,
-                      width: 50,
-                      height: 30,
-                  )
-                    ),
-                    const SizedBox(
-                      width: 10,
-                    ),
-                    Expanded(
-                      child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(  nomePais! , style: const TextStyle(color: Colors.black, fontSize: 17, fontWeight: FontWeight.w600)),
-                          Text( moeda! , style: const TextStyle(color: Colors.grey, fontSize: 15, fontWeight: FontWeight.w400))
-                    ],
-                   ),
-                    ),
-                    const Icon(Icons.chevron_right, 
-                      color: Colors.grey,
-                   )
-                  ],
-                ),
-                TextField(
-                  style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w500),
-                  decoration: InputDecoration(
-                    hintText: '0.0',
-                    suffixIcon: Text(
-                      simbolo!,
-                       style: const TextStyle(fontSize: 20, color: Colors.grey),),
-                    suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0)
-                  ),
-                )
-              ],
-            ),
-        )
-        );
   }
 }
